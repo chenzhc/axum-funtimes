@@ -1,9 +1,7 @@
-use std::net::SocketAddr;
+use std::{net::SocketAddr};
 
 use axum::{
-    routing::{get, post},
-    http::StatusCode,
-    Json, Router,
+    http::StatusCode, routing::{get, post}, Json, Router
 };
 use serde::{Deserialize, Serialize};
 
@@ -24,7 +22,17 @@ async fn main() {
     let addr = SocketAddr::from(([0,0,0,0], 6000));
     let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
     tracing::info!("listeing on {}", addr);
-    axum::serve(listener, app).await.unwrap();
+
+    let (shutdown, rx) = tokio::sync::oneshot::channel::<()>();
+    axum::serve(listener, app)
+        .with_graceful_shutdown(async move {
+          // this future
+          let _ = rx.await;
+          
+          tracing::info!("shutdow the server...");
+        })
+        .await
+        .unwrap();
 }
 
 // basic handler that responds with a static string
@@ -36,17 +44,24 @@ async fn root() -> &'static str {
 async fn create_user(
     // this argument tells axum to parse the request body
     // as JSON into a `CreateUser` type
+    // Query(params): Query<HashMap<String, String>>,
     Json(payload): Json<CreateUser>,
 ) -> (StatusCode, Json<User>) {
+
+    // params.get("myparam");
+
     // insert your application logic here
     let user = User {
         id: 1337,
         username: payload.username,
     };
 
+    // panic!("test");
+
     // this will be converted into a JSON response
     // with a status code of `201 Created`
     return (StatusCode::CREATED, Json(user));
+    // return Json(user)
 }
 
 // the input to our `create_user` handler
